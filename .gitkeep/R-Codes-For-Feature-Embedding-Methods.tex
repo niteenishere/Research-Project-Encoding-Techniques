@@ -1,0 +1,346 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+]{article}
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\usepackage{graphicx}
+\makeatletter
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{% scales image to fit in text height/width
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi% select the smaller of both
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+  \else\usebox{\pandoc@box}%
+  \fi%
+}
+% Set default figure placement to htbp
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={Feature Embedding Methods},
+  pdfauthor={Mr.Pardeshi},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{Feature Embedding Methods}
+\author{Mr.Pardeshi}
+\date{2026-03-06}
+
+\begin{document}
+\maketitle
+
+\subsection{R Markdown}\label{r-markdown}
+
+This is an R Markdown document. Markdown is a simple formatting syntax
+for authoring HTML, PDF, and MS Word documents. For more details on
+using R Markdown see \url{http://rmarkdown.rstudio.com}.
+
+When you click the \textbf{Knit} button a document will be generated
+that includes both content as well as the output of any embedded R code
+chunks within the document. You can embed an R code chunk like this:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# ==============================================================================}
+\CommentTok{\# Title: Contrast Encoding: Effect vs. Helmert}
+\CommentTok{\# Dataset: PlantGrowth (Built{-}in R dataset)}
+\CommentTok{\# Purpose: Demonstrate model fitting and interpretation using different encodings}
+\CommentTok{\# ==============================================================================}
+
+\CommentTok{\# 1. Load and prepare the dataset}
+\FunctionTok{data}\NormalTok{(}\StringTok{"PlantGrowth"}\NormalTok{)}
+\FunctionTok{View}\NormalTok{(PlantGrowth)}
+
+\CommentTok{\# Let\textquotesingle{}s quickly look at the group means to help us interpret the models later}
+\FunctionTok{cat}\NormalTok{(}\StringTok{"{-}{-}{-} Group Means {-}{-}{-}}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## --- Group Means ---
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{group\_means }\OtherTok{\textless{}{-}} \FunctionTok{tapply}\NormalTok{(PlantGrowth}\SpecialCharTok{$}\NormalTok{weight, PlantGrowth}\SpecialCharTok{$}\NormalTok{group, mean)}
+\FunctionTok{print}\NormalTok{(group\_means)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##  ctrl  trt1  trt2 
+## 5.032 4.661 5.526
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"Grand Mean:"}\NormalTok{, }\FunctionTok{mean}\NormalTok{(PlantGrowth}\SpecialCharTok{$}\NormalTok{weight), }\StringTok{"}\SpecialCharTok{\textbackslash{}n\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Grand Mean: 5.073
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# ==============================================================================}
+\CommentTok{\# 2. EFFECT ENCODING (Sum/Deviation Coding)}
+\CommentTok{\# ==============================================================================}
+\CommentTok{\# Concept: Compares the mean of a specific level to the GRAND MEAN of all levels.}
+\CommentTok{\# Useful when you want to know "Does this specific group perform above or }
+\CommentTok{\# below the overall average?" rather than comparing it to a control group.}
+
+\CommentTok{\# Apply Effect Encoding}
+\CommentTok{\# contr.sum(3) creates a matrix for 3 levels:}
+\CommentTok{\# ctrl:  1  0}
+\CommentTok{\# trt1:  0  1}
+\CommentTok{\# trt2: {-}1 {-}1}
+\FunctionTok{contrasts}\NormalTok{(PlantGrowth}\SpecialCharTok{$}\NormalTok{group) }\OtherTok{\textless{}{-}} \FunctionTok{contr.sum}\NormalTok{(}\DecValTok{3}\NormalTok{)}
+
+\CommentTok{\# Fit the linear model}
+\NormalTok{model\_effect }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(weight }\SpecialCharTok{\textasciitilde{}}\NormalTok{ group, }\AttributeTok{data =}\NormalTok{ PlantGrowth)}
+
+\FunctionTok{cat}\NormalTok{(}\StringTok{"========================================================}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## ========================================================
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"SUMMARY: EFFECT ENCODING (SUM CONTRASTS)}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## SUMMARY: EFFECT ENCODING (SUM CONTRASTS)
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"========================================================}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## ========================================================
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{print}\NormalTok{(}\FunctionTok{summary}\NormalTok{(model\_effect))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Call:
+## lm(formula = weight ~ group, data = PlantGrowth)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -1.0710 -0.4180 -0.0060  0.2627  1.3690 
+## 
+## Coefficients:
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)   5.0730     0.1138  44.573   <2e-16 ***
+## group1       -0.0410     0.1610  -0.255   0.8009    
+## group2       -0.4120     0.1610  -2.560   0.0164 *  
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.6234 on 27 degrees of freedom
+## Multiple R-squared:  0.2641, Adjusted R-squared:  0.2096 
+## F-statistic: 4.846 on 2 and 27 DF,  p-value: 0.01591
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# INTERPRETATION NOTES (Effect Encoding):}
+\CommentTok{\# {-} Intercept: The Unweighted Grand Mean (average of the 3 group means).}
+\CommentTok{\# {-} group1 (ctrl): The difference between the \textquotesingle{}ctrl\textquotesingle{} mean and the Grand Mean.}
+\CommentTok{\# {-} group2 (trt1): The difference between the \textquotesingle{}trt1\textquotesingle{} mean and the Grand Mean.}
+\CommentTok{\# {-} Note: trt2\textquotesingle{}s effect is not directly in the summary, but it can be calculated }
+\CommentTok{\#   as {-}(group1 + group2) because the sum of deviations from the mean is zero.}
+
+
+\CommentTok{\# ==============================================================================}
+\CommentTok{\# 3. HELMERT ENCODING}
+\CommentTok{\# ==============================================================================}
+\CommentTok{\# Concept: Compares each level of a categorical variable to the mean of the }
+\CommentTok{\# SUBSEQUENT (or previous) levels. }
+\CommentTok{\# Useful in ordinal data or when testing sequential treatments (e.g., comparing }
+\CommentTok{\# a new drug to the average of all previously existing drugs).}
+
+\CommentTok{\# Apply Helmert Encoding}
+\CommentTok{\# contr.helmert(3) creates a matrix:}
+\CommentTok{\# ctrl: {-}1 {-}1}
+\CommentTok{\# trt1:  1 {-}1}
+\CommentTok{\# trt2:  0  2}
+\FunctionTok{contrasts}\NormalTok{(PlantGrowth}\SpecialCharTok{$}\NormalTok{group) }\OtherTok{\textless{}{-}} \FunctionTok{contr.helmert}\NormalTok{(}\DecValTok{3}\NormalTok{)}
+
+\CommentTok{\# Fit the linear model}
+\NormalTok{model\_helmert }\OtherTok{\textless{}{-}} \FunctionTok{lm}\NormalTok{(weight }\SpecialCharTok{\textasciitilde{}}\NormalTok{ group, }\AttributeTok{data =}\NormalTok{ PlantGrowth)}
+
+\FunctionTok{cat}\NormalTok{(}\StringTok{"}\SpecialCharTok{\textbackslash{}n}\StringTok{========================================================}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## ========================================================
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"SUMMARY: HELMERT ENCODING}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## SUMMARY: HELMERT ENCODING
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{cat}\NormalTok{(}\StringTok{"========================================================}\SpecialCharTok{\textbackslash{}n}\StringTok{"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## ========================================================
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{print}\NormalTok{(}\FunctionTok{summary}\NormalTok{(model\_helmert))}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Call:
+## lm(formula = weight ~ group, data = PlantGrowth)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -1.0710 -0.4180 -0.0060  0.2627  1.3690 
+## 
+## Coefficients:
+##             Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)  5.07300    0.11381  44.573  < 2e-16 ***
+## group1      -0.18550    0.13939  -1.331  0.19439    
+## group2       0.22650    0.08048   2.814  0.00901 ** 
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+## 
+## Residual standard error: 0.6234 on 27 degrees of freedom
+## Multiple R-squared:  0.2641, Adjusted R-squared:  0.2096 
+## F-statistic: 4.846 on 2 and 27 DF,  p-value: 0.01591
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# INTERPRETATION NOTES (Helmert Encoding):}
+\CommentTok{\# {-} Intercept: The Unweighted Grand Mean.}
+\CommentTok{\# {-} group1: Compares Level 2 (trt1) to Level 1 (ctrl). }
+\CommentTok{\#   Because the contrast values are 1 and {-}1 (difference of 2), the coefficient }
+\CommentTok{\#   represents exactly HALF the difference between trt1 and ctrl means.}
+\CommentTok{\# {-} group2: Compares Level 3 (trt2) to the AVERAGE of Level 1 \& 2 (ctrl \& trt1).}
+\CommentTok{\#   Because the contrast values are 2 and {-}1 (difference of 3), the coefficient }
+\CommentTok{\#   represents exactly ONE THIRD of the difference between trt2 and the average }
+\CommentTok{\#   of the first two groups.}
+\CommentTok{\#}
+\CommentTok{\# *Note on modern Data Science tools: Some libraries normalize Helmert matrices }
+\CommentTok{\# so the coefficients represent the exact differences rather than fractions. }
+\CommentTok{\# R uses the unnormalized mathematical standard by default.}
+\end{Highlighting}
+\end{Shaded}
+
+
+\end{document}

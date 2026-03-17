@@ -1,0 +1,319 @@
+---
+title: "FPS_Video_Game"
+author: "Mr.Pardeshi"
+format: html
+editor: visual
+---
+
+## Quarto
+
+```{r}
+
+# ==============================================================================
+# FPS video game classification Classification: Target Encoding Visualization Dashboard
+# ==============================================================================
+
+suppressPackageStartupMessages({
+  library(readxl)
+  library(tidymodels)   
+  library(embed)        
+  library(dplyr)
+  library(tidyr)        # For data reshaping (separate and pivot)
+  library(ggplot2)      # For 10x Data Visualization
+  library(xgboost)      
+  library(glmnet)       
+  library(kknn)         
+  library(kernlab)  
+  library(writexl)
+  
+})
+
+# 1. LOAD & PREP DATA
+# ------------------------------------------------------------------------------
+# 1. Load the data
+fps_data <- read_excel("E:\\datasets for programming\\dataset\\fps-in-video-games.xlsx")
+
+View(fps_data)
+# 2. Select appropriate features and clean
+# We drop columns with zero variance or excessive missingness if they exist.
+# For this pipeline, we ensure target is numeric and categoricals are factors.
+fps_data <- fps_data %>%
+  # Drop rows where target (FPS) is missing
+  filter(!is.na(FPS)) %>%
+  # Convert character columns to factors explicitly
+  mutate(across(where(is.character), as.factor))
+library(reticulate)
+
+```
+
+You can add options to executable code like this
+
+### Identifying Associated Categorical Variable
+
+```{r}
+
+library(dplyr)
+library(rcompanion)
+
+categorical_association <- function(data, response){
+
+  # convert response name
+  response <- as.character(response)
+
+  # select categorical variables except response
+  cat_vars <- names(data)[sapply(data, function(x) is.factor(x) | is.character(x))]
+  cat_vars <- setdiff(cat_vars, response)
+
+  results <- data.frame()
+
+  for (var in cat_vars) {
+
+    tab <- table(data[[var]], data[[response]])
+
+    chi <- chisq.test(tab)
+
+    cramer <- cramerV(tab)
+
+    results <- rbind(results,
+                     data.frame(
+                       Variable = var,
+                       P_value = chi$p.value,
+                       Cramers_V = cramer
+                     ))
+  }
+
+  results <- results %>% arrange(Cramers_V,descreasing=TRUE)
+
+  return(results)
+}
+
+categorical_association(fps_data,'Dataset')
+
+```
+
+### For Regression
+
+```{python}
+
+
+import pandas as pd
+import numpy as np
+import category_encoders as ce
+from sklearn.model_selection import cross_validate, KFold
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.impute import SimpleImputer # Added to handle missing numeric data
+from sklearn.linear_model import Ridge, ElasticNet
+from sklearn.svm import SVR
+from sklearn.neighbors import KNeighborsRegressor
+from xgboost import XGBRegressor
+import warnings
+warnings.filterwarnings('ignore')
+
+# 1. IMPORT DATA FROM R
+df = r.fps_data.copy()
+
+# Identify categorical columns natively
+cat_cols = df.select_dtypes(include=['category', 'object']).columns.tolist()
+if 'FPS' in cat_cols: cat_cols.remove('FPS')
+# Force to string to avoid reticulate mapping issues
+df[cat_cols] = df[cat_cols].astype(str)
+
+X = df.drop('FPS', axis=1)
+y = df['FPS'].astype(float)
+
+# 2. DEFINE 4 REGRESSION ENCODERS
+encoders = {
+    'TargetMean': ce.TargetEncoder(cols=cat_cols),
+    'MEstimate': ce.MEstimateEncoder(cols=cat_cols, m=5.0), # Bayesian smoothing
+    'LeaveOneOut': ce.LeaveOneOutEncoder(cols=cat_cols),
+    'CatBoost': ce.CatBoostEncoder(cols=cat_cols)
+}
+
+# 3. DEFINE 5 REGRESSION MODELS
+models = {
+    'Ridge': Ridge(alpha=1.0), # L2 Regularized Linear Regression
+    'ElasticNet': ElasticNet(alpha=0.1, l1_ratio=0.5),
+    'KNN': KNeighborsRegressor(n_neighbors=5),
+    'SVR': SVR(kernel='rbf', C=1.0),
+    'XGBoost': XGBRegressor(eval_metric='rmse')
+}
+
+# 4. CROSS-VALIDATION PIPELINE
+cv = KFold(n_splits=5, shuffle=True, random_state=42)
+scoring_metrics = ['r2', 'neg_root_mean_squared_error', 'neg_mean_absolute_error']
+results_list = []
+
+print("--- Hardware FPS Regression: 5-Fold CV Results ---\n")
+
+for enc_name, encoder in encoders.items():
+    for mod_name, model in models.items():
+        
+        pipeline = Pipeline([
+            ('encoder', encoder),
+            ('imputer', SimpleImputer(strategy='median')), # CRITICAL FIX: Handles NaNs in hardware data
+            ('scaler', StandardScaler()), # Crucial for Ridge, SVR, and KNN
+            ('regressor', model)
+        ])
+        
+        # Removed n_jobs=-1 to prevent reticulate cross-language freezing
+        scores = cross_validate(pipeline, X, y, cv=cv, scoring=scoring_metrics)
+        
+        mean_r2 = np.mean(scores['test_r2'])
+        # Sklearn returns negative errors so larger is "better"; we flip them back to positive
+        mean_rmse = -np.mean(scores['test_neg_root_mean_squared_error'])
+        mean_mae  = -np.mean(scores['test_neg_mean_absolute_error'])
+        
+        results_list.append({
+            'Encoder': enc_name,
+            'Model': mod_name,
+            'R2_Score': mean_r2,
+            'RMSE': mean_rmse,
+            'MAE': mean_mae
+        })
+        
+        print(f"[{enc_name} + {mod_name}] R2: {mean_r2:.3f} | RMSE: {mean_rmse:.2f}")
+
+results_df = pd.DataFrame(results_list)
+
+```
+
+### For Classification
+
+```{python}
+import pandas as pd
+import numpy as np
+import category_encoders as ce
+from sklearn.model_selection import cross_validate, StratifiedKFold
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.impute import SimpleImputer # Added to handle missing numeric data
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from xgboost import XGBClassifier
+import warnings
+warnings.filterwarnings('ignore')
+
+# 1. IMPORT DATA FROM R
+# Assuming 'df' is loaded similarly; using a placeholder target column 'Class_Target'
+df = r.your_classification_data.copy() 
+
+# Identify categorical columns natively
+cat_cols = df.select_dtypes(include=['category', 'object']).columns.tolist()
+if 'Dataset' in cat_cols: cat_cols.remove('Dataset')
+# Force to string to avoid reticulate mapping issues
+df[cat_cols] = df[cat_cols].astype(str)
+
+X = df.drop('Dataset', axis=1)
+
+# Encode the target into integers (0, 1, 2...) - crucial for XGBoost and Target Encoders
+le = LabelEncoder()
+y = le.fit_transform(df['Dataset'])
+
+# 2. DEFINE 4 CLASSIFICATION ENCODERS
+# These encoders natively support classification by calculating the target mean probability
+encoders = {
+    'TargetMean': ce.TargetEncoder(cols=cat_cols),
+    'MEstimate': ce.MEstimateEncoder(cols=cat_cols, m=5.0), # Bayesian smoothing
+    'LeaveOneOut': ce.LeaveOneOutEncoder(cols=cat_cols),
+    'CatBoost': ce.CatBoostEncoder(cols=cat_cols)
+}
+
+# 3. DEFINE 5 CLASSIFICATION MODELS
+models = {
+    # L2 Regularized Logistic Regression (Classification equivalent to Ridge)
+    'LogReg_L2': LogisticRegression(penalty='l2', max_iter=1000), 
+    
+    # ElasticNet Logistic Regression
+    'ElasticNet': LogisticRegression(penalty='elasticnet', solver='saga', l1_ratio=0.5, max_iter=1000),
+    
+    'KNN': KNeighborsClassifier(n_neighbors=5),
+    'SVC': SVC(kernel='rbf', C=1.0),
+    'XGBoost': XGBClassifier(eval_metric='logloss', use_label_encoder=False)
+}
+
+# 4. CROSS-VALIDATION PIPELINE
+# StratifiedKFold ensures each fold has the same proportion of classes as the whole dataset
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+# Using F1-weighted to account for potential class imbalances
+scoring_metrics = ['accuracy', 'f1_weighted', 'precision_weighted']
+results_list = []
+
+print("--- Classification: 5-Fold CV Results ---\n")
+
+for enc_name, encoder in encoders.items():
+    for mod_name, model in models.items():
+        
+        pipeline = Pipeline([
+            ('encoder', encoder),
+            ('imputer', SimpleImputer(strategy='median')), # Handles NaNs in numeric data
+            ('scaler', StandardScaler()), # Crucial for LogReg, SVC, and KNN
+            ('classifier', model)
+        ])
+        
+        # Removed n_jobs=-1 to prevent reticulate cross-language freezing
+        scores = cross_validate(pipeline, X, y, cv=cv, scoring=scoring_metrics)
+        
+        mean_acc = np.mean(scores['test_accuracy'])
+        mean_f1  = np.mean(scores['test_f1_weighted'])
+        mean_prec = np.mean(scores['test_precision_weighted'])
+        
+        results_list.append({
+            'Encoder': enc_name,
+            'Model': mod_name,
+            'Accuracy': mean_acc,
+            'F1_Weighted': mean_f1,
+            'Precision': mean_prec
+        })
+        
+        print(f"[{enc_name} + {mod_name}] Accuracy: {mean_acc:.3f} | F1: {mean_f1:.3f}")
+
+results_df = pd.DataFrame(results_list)
+```
+
+```{r}
+library(ggplot2)
+
+r_results <- py$results_df
+
+# Reshape data for faceted plotting
+r_results_long <- r_results %>%
+  pivot_longer(
+    cols = c(R2_Score, RMSE, MAE),
+    names_to = "Metric",
+    values_to = "Score"
+  ) %>%
+  # Create a custom factor to order the facets logically
+  mutate(Metric = factor(Metric, levels = c("R2_Score", "RMSE", "MAE")))
+
+ggplot(r_results_long, aes(x = reorder(Model, Score), y = Score, fill = Encoder)) +
+  geom_col(position = position_dodge(width = 0.8), color = "black", alpha = 0.85, width = 0.8) +
+  coord_flip() +
+  facet_wrap(~Metric, scales = "free_x") + 
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(face = "bold", size = 14),
+    panel.spacing = unit(2, "lines"),
+    legend.position = "bottom"
+  ) +
+  labs(
+    title = "Hardware FPS Prediction: Regression Model Performance",
+    subtitle = "Comparing Continuous Target Encodings (Higher R2 is better; Lower RMSE/MAE is better)",
+    x = "Machine Learning Algorithm",
+    y = "Evaluation Metric Score",
+    fill = "Encoding Strategy:"
+  ) +
+  scale_fill_brewer(palette = "Set2") + # Distinct colors for the 4 encoders
+  geom_text(
+    aes(label = sprintf("%.2f", Score)), 
+    position = position_dodge(width = 0.8), 
+    hjust = -0.1, 
+    size = 3.2
+  ) +
+  # Expand X axis limits dynamically based on the facet to fit text
+  scale_y_continuous(expand = expansion(mult = c(0, 0.2))) 
+
+
+```

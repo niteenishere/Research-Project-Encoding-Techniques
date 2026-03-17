@@ -1,0 +1,839 @@
+---
+title: "ML Models For Research Project2 Bank Market dataset"
+author: "Mr. Pardeshi"
+format: html
+editor: visual
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Running Code
+
+```{r}
+
+
+
+# Load the foreign library (it comes pre-installed with R)
+library(foreign)
+
+# Read the ARFF file directly into a Data Frame
+Bank_market <- read.arff("E:\\datasets for programming\\dataset\\Bank Market.arff")
+
+# View the structure to confirm it loaded correctly
+str(Bank_market)
+View(Bank_market)
+library(writexl)
+write_xlsx(Bank_market,"E:\\datasets for programming\\dataset\\Bank Market.xlsx")
+```
+
+Cramer's V is the most common effect size measure for nominal categorical variables, scaling the Chi-Square statistic to a value between 0 and 1.
+
+$V = \sqrt{\frac{\chi^2}{n \cdot \min(r-1, c-1)}}$
+
+Cohen's major contribution was establishing that **the thresholds for Cramer's V are not static; they change based on the degrees of freedom** of the smaller dimension of your contingency table. Let $df^* = \min(r-1, c-1)$, where $r$ is the number of rows and $c$ is the number of columns.
+
+## Identifying Truely Associated categorical variables with Response Variable
+
+```{r}
+
+library(dplyr)
+library(rcompanion)
+
+categorical_association <- function(data, response){
+
+  # convert response name
+  response <- as.character(response)
+
+  # select categorical variables except response
+  cat_vars <- names(data)[sapply(data, function(x) is.factor(x) | is.character(x))]
+  cat_vars <- setdiff(cat_vars, response)
+
+  results <- data.frame()
+
+  for (var in cat_vars) {
+
+    tab <- table(data[[var]], data[[response]])
+
+    chi <- chisq.test(tab)
+
+    cramer <- cramerV(tab)
+
+    results <- rbind(results,
+                     data.frame(
+                       Variable = var,
+                       P_value = round(chi$p.value,4),
+                       Cramers_V = cramer
+                     ))
+  }
+
+  results <- results %>% arrange(Cramers_V,descreasing=TRUE)
+
+  return(results)
+}
+
+CA=categorical_association(Bank_market,'Class')
+
+# Find the row names where ANY value in that row is > 0.2
+var <- rownames(CA)[apply(CA, 1, function(row) any(row > 0.2))] 
+```
+
+### Encoding Categorical Feature:
+
+```{r}
+# ==============================================================================
+# Bank Market Classification: Advanced Target-Based Encoding Pipeline
+# ==============================================================================
+
+# 1. LOAD REQUIRED LIBRARIES
+# ------------------------------------------------------------------------------
+# Suppress startup messages for a clean console
+suppressPackageStartupMessages({
+  library(tidymodels)   # The modern meta-engine for R machine learning
+  library(embed)        # Advanced categorical encodings (Target, Bayesian, etc.)
+  library(dplyr)        # Data manipulation
+  library(xgboost)      # Tree-based model
+  library(glmnet)       # Elastic Net model
+  library(kknn)         # Distance-based model
+  library(kernlab)      # SVM model
+})
+
+
+```
+
+```{r}
+# 2. DATA PREPARATION & FEATURE IDENTIFICATION
+# ------------------------------------------------------------------------------
+# Assuming 'Bank_market' is already loaded via the foreign package.
+# We will simulate the loading step here for reproducibility.
+# Bank_market <- foreign::read.arff("Bank Market.xlsx - Sheet1.arff")
+
+# Ensure Target is a proper factor (tidymodels requires categorical targets for classification)
+# Assuming 1 = "Negative" (No Subscribe) and 2 = "Positive" (Subscribe)
+Bank_market <- Bank_market %>%
+  mutate(
+    Class = factor(Class, levels = c(1, 2), labels = c("Negative", "Positive")),
+    # Automatically convert any character columns to factors
+    across(where(is.character), as.factor)
+)
+Bank_market
+```
+
+```{r}
+
+# 3. DEFINE PREPROCESSING RECIPES (THE ENCODINGS)
+# ------------------------------------------------------------------------------
+# Base recipe: Define formula and normalize numeric predictors (Crucial for SVM/KNN)
+base_recipe <- recipe(Class ~ ., data = Bank_market) %>%
+  step_normalize(all_numeric_predictors()) 
+
+# A. Target Mean Encoding (GLM-based Log-Odds)
+# Replaces categories with the raw mean of the target variable.
+rec_target_mean <- base_recipe %>%
+  embed::step_lencode_glm(all_nominal_predictors(), outcome = vars(Class))
+
+# B. Bayesian Mean Encoding (GLMM - Empirical Bayes Shrinkage)
+# Uses partial pooling. Rare categories are "shrunk" toward the global mean.
+rec_bayesian <- base_recipe %>%
+  embed::step_lencode_mixed(all_nominal_predictors(), outcome = vars(Class))
+
+# C. Out-Of-Fold Encoding (LOOE Approximation)
+# Note: True LOOE is computationally disastrous for large datasets. 
+# tidymodels achieves the exact same mathematical goal (preventing leakage) 
+# by calculating the encodings strictly OUTSIDE the current CV assessment fold.
+# We use full Bayesian estimation (Stan) here as our 3rd robust technique.
+rec_looe_bayes <- base_recipe %>%
+  embed::step_lencode_bayes(all_nominal_predictors(), outcome = vars(Class))
+
+# C. Weight of Evidence Encoding (Log-Odds)
+rec_woe <- recipe(Class ~ ., data = Bank_market) %>%
+  embed::step_woe(all_nominal_predictors(), outcome = vars(Class)) %>%
+  step_normalize(all_numeric_predictors())
+
+
+
+```
+
+### Python Chunk for Catboost
+
+```{r}
+
+# 2. Clean the target variable in R
+Bank_market <- Bank_market %>%
+  mutate(
+    Class = ifelse(Class == 2, 1, 0), # 1 = Subscribe, 0 = No Subscribe
+    across(where(is.character), as.factor)
+  )
+
+```
+
+```{python python-pipeline}
+
+## 2. The Python Encoding & Modeling Engine
+Now, we switch to a Python chunk. The `reticulate` package automatically makes all R objects available in Python through the `r.` object prefix. We will use Python's `category_encoders` library, which contains the highly sought-after `CatBoostEncoder`.
+
+# Import Python Machine Learning Libraries
+import pandas as pd
+import numpy as np
+import category_encoders as ce
+from sklearn.model_selection import cross_validate, StratifiedKFold
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from xgboost import XGBClassifier
+
+# 1. IMPORT DATA FROM R
+# Access the R dataframe directly using 'r.'
+df = r.Bank_market.copy()
+
+X = df.drop('Class', axis=1)
+y = df['Class'].astype(int)
+
+# Identify categorical columns
+cat_cols = X.select_dtypes(include=['category', 'object']).columns.tolist()
+
+# 2. DEFINE THE ENCODERS
+# Python's category_encoders library supports all of these natively!
+encoders = {
+    'TargetMean': ce.TargetEncoder(cols=cat_cols, smoothing=10),
+    'WoE': ce.WOEEncoder(cols=cat_cols),
+    'CatBoost': ce.CatBoostEncoder(cols=cat_cols) # The missing piece from R!
+}
+
+# 3. DEFINE THE MODELS
+models = {
+    'LogReg': LogisticRegression(max_iter=1000),
+    'XGBoost': XGBClassifier(use_label_encoder=False, eval_metric='logloss')
+}
+
+# 4. CROSS-VALIDATION PIPELINE
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+results_list = []
+
+print("--- Polyglot Cross-Validation Results ---\n")
+
+for enc_name, encoder in encoders.items():
+    for mod_name, model in models.items():
+        
+        # Build a Sklearn Pipeline: Encode -> Scale -> Model
+        pipeline = Pipeline([
+            ('encoder', encoder),
+            ('scaler', StandardScaler()),
+            ('classifier', model)
+        ])
+        
+        # Run 5-Fold Cross Validation
+        scores = cross_validate(pipeline, X, y, cv=cv, scoring='roc_auc', n_jobs=-1)
+        mean_auc = np.mean(scores['test_score'])
+        
+        results_list.append({
+            'Encoder': enc_name,
+            'Model': mod_name,
+            'ROC_AUC': mean_auc
+        })
+        
+        print(f"[{enc_name} + {mod_name}] ROC-AUC: {mean_auc:.4f}")
+
+# Convert results to a pandas dataframe to easily pass back to R
+results_df = pd.DataFrame(results_list)
+
+## 3. Returning to R for Visualization
+We can now switch back to an R chunk and access the Python results dataframe using the `py$` object prefix!
+
+library(ggplot2)
+
+# Pull the results_df from Python back into R
+r_results <- py$results_df
+
+# Visualize the Polyglot Results
+ggplot(r_results, aes(x = Encoder, y = ROC_AUC, fill = Model)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(
+    title = "Cross-Language Encoding Benchmark",
+    subtitle = "CatBoost Encoding executed in Python, Visualized in R",
+    y = "Mean ROC-AUC (5-Fold CV)"
+  ) +
+  scale_fill_manual(values = c("LogReg" = "#3498db", "XGBoost" = "#e74c3c"))
+
+```
+
+```{r}
+
+# 4. DEFINE MACHINE LEARNING MODELS
+# ------------------------------------------------------------------------------
+# We instantiate models without extreme tuning to focus on the encoding effects.
+
+mod_logreg <- logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification")
+
+mod_elastic <- logistic_reg(penalty = 0.01, mixture = 0.5) %>% 
+ 
+   set_engine("glmnet") %>% 
+  set_mode("classification")
+
+mod_svm <- svm_rbf(cost = 1) %>% 
+  set_engine("kernlab") %>% 
+  set_mode("classification")
+
+mod_knn <- nearest_neighbor(neighbors = 5) %>% 
+  set_engine("kknn") %>% 
+  set_mode("classification")
+
+mod_xgb <- boost_tree(trees = 100) %>% 
+  set_engine("xgboost") %>% 
+  set_mode("classification")
+
+```
+
+```{r}
+# 5. CROSS-VALIDATION SCHEME & WORKFLOW SET
+# ------------------------------------------------------------------------------
+set.seed(42)
+# 5-Fold Cross Validation, stratified by the target to handle class imbalance
+cv_folds <- vfold_cv(Bank_market, v = 5, strata = Class)
+
+# Define the metrics we want to track
+cls_metrics <- metric_set(roc_auc, f_meas, accuracy)
+
+# 
+# # The "10x Productivity" Move: workflow_set()
+# # This creates a Cartesian product of our 3 Encodings x 5 Models = 15 pipelines!
+# all_workflows <- workflow_set(
+#   preproc = list(
+#     TargetMean = rec_target_mean, 
+#     Bayesian   = rec_bayesian, 
+#     LOOE_Bayes = rec_looe_bayes
+#   ),
+#   models = list(
+#     LogReg     = mod_logreg,
+#     ElasticNet = mod_elastic,
+#     SVM        = mod_svm,
+#     KNN        = mod_knn,
+#     XGBoost    = mod_xgb
+#   )
+# )
+
+
+```
+
+```{r}
+
+# ------------------------------------------------------------------------------
+# 10x PRODUCTIVITY FIX: OPTIMIZED WORKFLOW
+# ------------------------------------------------------------------------------
+# We are removing 'rec_looe_bayes' to bypass the 'rstanarm' dependency and MCMC 
+# computation time. We will compare raw Target Mean vs. Empirical Bayes (Mixed).
+
+# Re-define the workflow set with just the two highly efficient encodings
+all_workflows_optimized <- workflow_set(
+  preproc = list(
+    TargetMean = rec_target_mean, 
+    EmpiricalBayes = rec_bayesian,
+    Weight_of_evidence =rec_woe,
+    CatBoost   = rec_catboost
+    # This will still trigger the singular fit warning, which is statistically fine!
+  ),
+  models = list(
+    LogReg     = mod_logreg,
+    ElasticNet = mod_elastic,
+    SVM        = mod_svm,
+    KNN        = mod_knn,
+    XGBoost    = mod_xgb
+  )
+)
+
+cat("Training 15 optimized pipelines across CV folds...\n")
+cat("(Note: You can safely ignore 'boundary (singular) fit' warnings)\n\n")
+
+# Run the workflows
+cv_results_optimized <- all_workflows_optimized %>%
+  workflow_map(
+    "fit_resamples",
+    resamples = cv_folds,
+    metrics = cls_metrics,
+    control = control_resamples(save_pred = TRUE) 
+  )
+
+
+
+```
+
+```{r}
+# 7. CONSOLIDATED SUMMARY & COMPARATIVE ANALYSIS
+# ------------------------------------------------------------------------------
+# Extract the results into a clean, readable performance matrix
+performance_matrix <- collect_metrics(cv_results_optimized) %>%
+  select(wflow_id, .metric, mean) %>%
+  tidyr::pivot_wider(names_from = .metric, values_from = mean) %>%
+  arrange(desc(roc_auc))
+
+cat("\n--- CONSOLIDATED PERFORMANCE MATRIX ---\n")
+print(performance_matrix)
+
+
+# To visualize this locally, you can run: 
+# autoplot(cv_results) + theme_minimal() + labs(title = "Encoding vs. Model Performance")
+```
+
+### Performance Assessment using Target Based Encoding:
+
+```{r}
+# 7. CONSOLIDATED SUMMARY & COMPARATIVE ANALYSIS
+# ------------------------------------------------------------------------------
+# Extract the results into a clean, readable performance matrix
+performance_matrix <- collect_metrics(cv_results_optimized) %>%
+  select(wflow_id, .metric, mean) %>%
+  tidyr::pivot_wider(names_from = .metric, values_from = mean) %>%
+  arrange(desc(roc_auc))
+
+cat("\n--- CONSOLIDATED PERFORMANCE MATRIX ---\n")
+print(performance_matrix)
+
+
+# To visualize this locally, you can run: 
+# autoplot(cv_results) + theme_minimal() + labs(title = "Encoding vs. Model Performance")
+```
+
+### Performance Evaluation Using CatBoost Encoding :
+
+```{r}
+
+all_workflows_optimized_Catboost <- workflow_set(
+  preproc = list(
+    CatBoost   = rec_catboost
+    # This will still trigger the singular fit warning, which is statistically fine!
+  ),
+  models = list(
+    LogReg     = mod_logreg,
+    ElasticNet = mod_elastic,
+    SVM        = mod_svm,
+    KNN        = mod_knn,
+    XGBoost    = mod_xgb
+  )
+)
+
+
+# Run the workflows
+cv_results_optimized_Catboost <- all_workflows_optimized_Catboost %>%
+  workflow_map(
+    "fit_resamples",
+    resamples = cv_folds,
+    metrics = cls_metrics,
+    control = control_resamples(save_pred = TRUE) 
+  )
+
+
+# Extract the results into a clean, readable performance matrix
+performance_matrix_Catboost <- collect_metrics(cv_results_optimized_Catboost) %>%
+  select(wflow_id, .metric, mean) %>%
+  tidyr::pivot_wider(names_from = .metric, values_from = mean) %>%
+  arrange(desc(roc_auc))
+
+cat("\n--- CONSOLIDATED PERFORMANCE MATRIX ---\n")
+print(performance_matrix)
+
+```
+
+## Python
+
+```{r}
+
+# Load reticulate to enable Python chunks
+library(reticulate)
+library(dplyr)
+library(foreign)
+
+# Specify your Python environment if needed (optional)
+# use_condaenv("base") 
+
+# 1. Load the data natively in R
+Bank_market <- foreign::read.arff("E:\\datasets for programming\\dataset\\Bank Market.arff")
+
+# 2. Clean the target variable in R
+Bank_market <- Bank_market %>%
+  mutate(
+    Class = ifelse(Class == 2, 1, 0), # 1 = Subscribe, 0 = No Subscribe
+    across(where(is.character), as.factor)
+  )
+
+```
+
+```{python}
+
+import pandas as pd
+import numpy as np
+import category_encoders as ce
+from sklearn.model_selection import cross_validate, StratifiedKFold
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from xgboost import XGBClassifier
+import warnings
+warnings.filterwarnings('ignore') # Suppress solver convergence warnings for clean output
+
+# 1. IMPORT DATA FROM R
+df = r.Bank_market.copy()
+
+# Fix: Force R factors into standard Python strings to avoid category_encoder crashes
+cat_cols = df.select_dtypes(include=['category', 'object']).columns.tolist()
+if 'Class' in cat_cols: cat_cols.remove('Class')
+df[cat_cols] = df[cat_cols].astype(str)
+
+X = df.drop('Class', axis=1)
+y = df['Class'].astype(int)
+
+# 2. DEFINE THE 5 MODELS
+models = {
+    'LogReg': LogisticRegression(max_iter=1000),
+    'ElasticNet': LogisticRegression(penalty='elasticnet', solver='saga', l1_ratio=0.5, max_iter=1000),
+    'KNN': KNeighborsClassifier(n_neighbors=5),
+    'SVM': SVC(probability=True, max_iter=1000), 
+    'XGBoost': XGBClassifier(eval_metric='logloss')
+}
+
+# 3. CROSS-VALIDATION PIPELINE (CatBoost Encoding ONLY)
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+# Define multiple scoring metrics
+scoring_metrics = ['roc_auc', 'f1', 'accuracy']
+results_list = []
+
+print("--- CatBoost Encoding: 5-Fold CV Results ---\n")
+
+for mod_name, model in models.items():
+    
+    # Build a Sklearn Pipeline: Encode -> Scale -> Model
+    pipeline = Pipeline([
+        ('encoder', ce.CatBoostEncoder(cols=cat_cols)),
+        ('scaler', StandardScaler()),
+        ('classifier', model)
+    ])
+    
+    # Run 5-Fold Cross Validation for multiple metrics
+    scores = cross_validate(pipeline, X, y, cv=cv, scoring=scoring_metrics, n_jobs=-1)
+    
+    mean_auc = np.mean(scores['test_roc_auc'])
+    mean_f1  = np.mean(scores['test_f1'])
+    mean_acc = np.mean(scores['test_accuracy'])
+    
+    results_list.append({
+        'Encoder': 'CatBoost',
+        'Model': mod_name,
+        'ROC_AUC': mean_auc,
+        'F1_Score': mean_f1,
+        'Accuracy': mean_acc
+    })
+    
+    print(f"[{mod_name}] AUC: {mean_auc:.4f} | F1: {mean_f1:.4f} | Acc: {mean_acc:.4f}")
+
+# Convert results to a pandas dataframe to easily pass back to R
+results_df = pd.DataFrame(results_list)
+
+results_df
+```
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+
+
+# Pull the results_df from Python back into R
+r_results <- py$results_df
+
+# 10x Data Scientist Move: Reshape the data from Wide to Long format
+r_results_long <- r_results %>%
+  pivot_longer(
+    cols = c(ROC_AUC, F1_Score, Accuracy),
+    names_to = "Metric",
+    values_to = "Score"
+  )
+
+# Visualize the comprehensive performance matrix
+ggplot(r_results_long, aes(x = reorder(Model, Score), y = Score, fill = Model)) +
+  geom_col(color = "black", alpha = 0.8) +
+  coord_flip() + 
+  facet_wrap(~Metric, scales = "free_x") + # Creates 3 separate panels!
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(face = "bold", size = 14), # Bold the panel headers
+    panel.spacing = unit(2, "lines") # Add breathing room between plots
+  ) +
+  labs(
+    title = "Comprehensive Model Performance using CatBoost Encoding",
+    subtitle = "Comparing ROC-AUC, F1-Score, and Accuracy via 5-Fold CV",
+    x = "Machine Learning Model",
+    y = "Evaluation Score"
+  ) +
+  scale_fill_viridis_d(guide = "none") + 
+  geom_text(aes(label = sprintf("%.3f", Score)), hjust = -0.15, size = 3.5) +
+  scale_y_continuous(limits = c(0, 1.15)) # Give text room to breathe
+
+```
+
+## Recall For Comparison Purpose
+
+```{r}
+
+# ==============================================================================
+# Bank Market Classification: Target Encoding Visualization Dashboard
+# ==============================================================================
+
+suppressPackageStartupMessages({
+  library(tidymodels)   
+  library(embed)        
+  library(dplyr)
+  library(tidyr)        # For data reshaping (separate and pivot)
+  library(ggplot2)      # For 10x Data Visualization
+  library(xgboost)      
+  library(glmnet)       
+  library(kknn)         
+  library(kernlab)      
+})
+
+# 1. LOAD & PREP DATA
+# ------------------------------------------------------------------------------
+Bank_market <- foreign::read.arff("E:\\datasets for programming\\dataset\\Bank Market.arff") %>%
+  mutate(
+    Class = factor(Class, levels = c(1, 2), labels = c("Negative", "Positive")),
+    across(where(is.character), as.factor)
+  )
+
+# 2. DEFINE RECIPES (Target Mean, Bayesian, WoE)
+# ------------------------------------------------------------------------------
+rec_target_mean <- recipe(Class ~ ., data = Bank_market) %>%
+  embed::step_lencode_glm(all_nominal_predictors(), outcome = vars(Class)) %>%
+  step_normalize(all_numeric_predictors()) 
+
+rec_bayesian <- recipe(Class ~ ., data = Bank_market) %>%
+  embed::step_lencode_mixed(all_nominal_predictors(), outcome = vars(Class)) %>%
+  step_normalize(all_numeric_predictors())
+
+rec_woe <- recipe(Class ~ ., data = Bank_market) %>%
+  embed::step_woe(all_nominal_predictors(), outcome = vars(Class)) %>%
+  step_normalize(all_numeric_predictors())
+
+# 3. DEFINE MODELS & WORKFLOW
+# ------------------------------------------------------------------------------
+mod_logreg <- logistic_reg() %>% set_engine("glm") %>% set_mode("classification")
+mod_elastic <- logistic_reg(penalty = 0.01, mixture = 0.5) %>% set_engine("glmnet") %>% set_mode("classification")
+mod_svm <- svm_rbf(cost = 1) %>% set_engine("kernlab") %>% set_mode("classification")
+mod_knn <- nearest_neighbor(neighbors = 5) %>% set_engine("kknn") %>% set_mode("classification")
+mod_xgb <- boost_tree(trees = 100) %>% set_engine("xgboost") %>% set_mode("classification")
+
+all_workflows <- workflow_set(
+  preproc = list(TargetMean = rec_target_mean, Bayesian = rec_bayesian, WoE = rec_woe),
+  models = list(LogReg = mod_logreg, ElasticNet = mod_elastic, SVM = mod_svm, KNN = mod_knn, XGBoost = mod_xgb)
+)
+
+# 4. TRAIN (5-Fold CV)
+# ------------------------------------------------------------------------------
+set.seed(42)
+cv_folds <- vfold_cv(Bank_market, v = 5, strata = Class)
+cls_metrics <- metric_set(roc_auc, f_meas, accuracy)
+
+cat("Training 15 pipelines... please wait.\n")
+cv_results <- all_workflows %>%
+  workflow_map("fit_resamples", resamples = cv_folds, metrics = cls_metrics)
+
+# 5. DATA WRANGLING FOR VISUALIZATION (The 10x Trick)
+# ------------------------------------------------------------------------------
+plot_data <- collect_metrics(cv_results) %>%
+  filter(.metric %in% c("roc_auc", "f_meas", "accuracy")) %>%
+  # Magic Step: Split 'WoE_XGBoost' into Encoder='WoE' and Model='XGBoost'
+  separate(wflow_id, into = c("Encoder", "Model"), sep = "_", extra = "merge") %>%
+  mutate(
+    # Clean up metric names for the plot titles
+    Metric = case_when(
+      .metric == "roc_auc" ~ "ROC_AUC",
+      .metric == "f_meas" ~ "F1_Score",
+      .metric == "accuracy" ~ "Accuracy"
+    )
+  )
+
+# 6. FACETED GGPLOT DASHBOARD
+# ------------------------------------------------------------------------------
+# Create a grouped bar chart using position_dodge()
+ggplot(plot_data, aes(x = reorder(Model, mean), y = mean, fill = Encoder)) +
+  geom_col(position = position_dodge(width = 0.8), color = "black", alpha = 0.85, width = 1.0) +
+  coord_flip() +
+  facet_wrap(~Metric, scales = "free_x") +
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(face = "bold", size = 14),
+    panel.spacing = unit(2, "lines"),
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold")
+  ) +
+  labs(
+    title = "Encoder vs. Algorithm Performance Dashboard",
+    subtitle = "Comparing Target Mean, Bayesian, and WoE across 5 Model Families",
+    x = "Machine Learning Algorithm",
+    y = "Evaluation Score",
+    fill = "Encoding Strategy:"
+  ) +
+  scale_fill_viridis_d(option = "mako") + # 'mako' gives a highly professional blue/purple palette
+  geom_text(
+    aes(label = sprintf("%.3f", mean)), 
+    position = position_dodge(width = 0.8), 
+    hjust = -0.15, 
+    size = 3.2
+  ) +
+  scale_y_continuous(limits = c(0, 1.15)) # Extra space for the text labels
+
+```
+
+```{r}
+#| layout-ncol: 2
+#| fig-cap: 
+#|   - "Before Transformation"
+#|   - "After Transformation"
+
+x=runif(1000,2,10)
+hist(x)
+hist(log(x))
+```
+
+```{r}
+
+#| label: calculate-categorical-associations
+#| code-fold: true
+#| code-summary: "Generalized Cramer's V Function"
+
+get_significant_associations <- function(data) {
+  
+  # 1. Isolate only categorical or character columns
+  cat_cols <- names(data)[sapply(data, function(x) is.factor(x) || is.character(x))]
+  
+  if(length(cat_cols) < 2) {
+    stop("The dataset must contain at least two categorical variables.")
+  }
+  
+  results <- data.frame()
+  
+  # 2. Iterate through all unique pairs of categorical variables
+  for(i in 1:(length(cat_cols)-1)) {
+    for(j in (i+1):length(cat_cols)) {
+      var1 <- cat_cols[i]
+      var2 <- cat_cols[j]
+      
+      # Create a contingency table (ignoring missing values)
+      tbl <- table(data[[var1]], data[[var2]])
+      
+      # Ensure the table has at least 2x2 dimensions to calculate Chi-Square
+      if(nrow(tbl) > 1 && ncol(tbl) > 1) {
+        
+        # Calculate Chi-Square statistic
+        chi2 <- suppressWarnings(chisq.test(tbl, correct = FALSE)$statistic)
+        n <- sum(tbl)
+        
+        # Calculate df* (minimum dimension minus 1)
+        df_star <- min(nrow(tbl) - 1, ncol(tbl) - 1)
+        
+        # Calculate Cramer's V
+        v <- sqrt(chi2 / (n * df_star))
+        
+        # 3. Dynamically apply Cohen's Thresholds based on df*
+        if(df_star == 1) {
+          med_thresh <- 0.30; lrg_thresh <- 0.50
+        } else if (df_star == 2) {
+          med_thresh <- 0.21; lrg_thresh <- 0.35
+        } else if (df_star == 3) {
+          med_thresh <- 0.17; lrg_thresh <- 0.29
+        } else {
+          med_thresh <- 0.15; lrg_thresh <- 0.25 # For df* >= 4
+        }
+        
+        # Classify the effect size
+        strength <- ifelse(v >= lrg_thresh, "Large",
+                           ifelse(v >= med_thresh, "Medium", "Weak"))
+        
+        # Append to results
+        results <- rbind(results, data.frame(
+          Variable_1 = var1,
+          Variable_2 = var2,
+          df_star = df_star,
+          Cramers_V = round(v, 4),
+          Effect_Size = strength
+        ))
+      }
+    }
+  }
+  
+  # 4. Filter for significance and sort descending
+  significant_results <- results[results$Effect_Size %in% c("Medium", "Large"), ]
+  significant_results <- significant_results[order(-significant_results$Cramers_V), ]
+  row.names(significant_results) <- NULL
+  
+  return(significant_results)
+}
+
+# --- Example Usage ---
+# df <- read.csv("your_data.csv")
+strong_features <- get_significant_associations(Bank_market)
+print(strong_features)
+```
+
+```{}
+```
+
+```{r}
+
+#| label: fig-categorical-heatmap
+#| fig-cap: "Interactive Heatmap of Significant Categorical Associations"
+#| fig-width: 10
+#| fig-height: 8
+#| warning: false
+#| message: false
+
+library(ggplot2)
+library(plotly)
+
+# Assuming 'strong_features' is the data frame generated from the previous function
+
+# 1. Create a mirrored dataset so the heatmap matrix is symmetrical
+heatmap_data <- rbind(
+  strong_features[, c("Variable_1", "Variable_2", "Cramers_V", "Effect_Size")],
+  data.frame(Variable_1 = strong_features$Variable_2,
+             Variable_2 = strong_features$Variable_1,
+             Cramers_V = strong_features$Cramers_V,
+             Effect_Size = strong_features$Effect_Size)
+)
+
+# 2. Build the static ggplot with a custom HTML tooltip aesthetic
+p <- ggplot(heatmap_data, aes(x = Variable_1, y = Variable_2, fill = Cramers_V,
+                              text = paste("<b>Feature 1:</b>", Variable_1,
+                                           "<br><b>Feature 2:</b>", Variable_2,
+                                           "<br><b>Cramer's V:</b>", Cramers_V,
+                                           "<br><b>Effect Size:</b>", Effect_Size))) +
+  # Draw the tiles
+  geom_tile(color = "white", linewidth = 0.5) +
+  # Use a clean, colorblind-friendly gradient (white -> blue -> dark orange)
+  scale_fill_gradient2(low = "#f7f7f7", mid = "#67a9cf", high = "#ef8a62", 
+                       midpoint = 0.25, limit = c(0, 1), space = "Lab", 
+                       name="Cramer's V") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1, size = 12, hjust = 1),
+    axis.text.y = element_text(size = 12),
+    axis.title = element_blank(),
+    panel.grid.major = element_blank()
+  ) +
+  # Keep the tiles perfectly square
+  coord_fixed()
+
+# 3. Convert to a highly interactive HTML widget
+# The 'tooltip = "text"' tells plotly to use our custom formatted string
+ggplotly(p, tooltip = "text") %>%
+  layout(
+    # Add extra margins so long variable names are completely visible
+    margin = list(b = 120, l = 120),
+    # Tidy up the hover interaction
+    hoverlabel = list(bgcolor = "white", font = list(size = 14))
+  )
+```
