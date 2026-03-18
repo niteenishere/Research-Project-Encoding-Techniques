@@ -1,31 +1,33 @@
-# Research-Project-Encoding-Techniques
-# Study of Feature Encoding Techniques for Machine Learning
+# 📊 Study of Feature Encoding Techniques in Machine Learning
 
-## Overview
+![Python](https://img.shields.io/badge/Python-3.x-blue)
+![Machine Learning](https://img.shields.io/badge/Machine-Learning-green)
+![Status](https://img.shields.io/badge/Project-Research-orange)
+![License](https://img.shields.io/badge/License-Academic-lightgrey)
 
-This repository contains the research project **“Study of Several Feature Encoding Methods”**, which investigates how different categorical feature encoding techniques influence the performance of supervised machine learning models.
+## 📌 Overview
 
-Many real-world datasets contain **categorical variables** that cannot be directly used by machine learning algorithms. Since most machine learning models operate on numerical feature vectors, categorical variables must first be transformed into numerical representations through **feature encoding techniques**.
+This repository contains the research project **“Study of Feature Encoding Techniques”**, which investigates how different categorical feature encoding techniques influence the performance of supervised machine learning models.
 
-This project systematically studies several encoding methods and analyzes their effect on model performance, particularly when dealing with **high-cardinality categorical variables**.
+Many real-world datasets contain **categorical variables** that cannot be directly used by machine learning algorithms. Since most ML algorithms operate on **numerical feature vectors**, categorical variables must first be transformed into numerical representations using **feature encoding techniques**.
+
+This project studies several encoding approaches and evaluates how they affect model performance, particularly in datasets containing **high-cardinality categorical variables**.
 
 ---
 
-## Research Objectives
+## 🎯 Research Objectives
 
-The primary objectives of this project are:
+The main goals of this research are:
 
 - To understand the theoretical foundations of categorical feature encoding.
-- To study different encoding techniques used in machine learning.
-- To investigate the impact of encoding methods on model performance.
-- To analyze how encoding methods handle **high-cardinality categorical variables**.
-- To compare encoding methods using multiple supervised machine learning algorithms.
+- To study multiple encoding techniques used in machine learning.
+- To evaluate the impact of encoding techniques on model performance.
+- To investigate how encoding techniques handle **high-cardinality categorical variables**.
+- To compare encoding techniques across multiple supervised ML algorithms.
 
 ---
 
-## Feature Encoding Techniques Studied
-
-The following encoding techniques are studied in this project:
+## 🧠 Encoding Techniques Studied
 
 ### Classical Encoding Methods
 - Label Encoding
@@ -44,16 +46,16 @@ The following encoding techniques are studied in this project:
 - Leave-One-Out Encoding
 - Weight of Evidence Encoding
 
-### Advanced Encoding Methods
+### Advanced Encoding Techniques
 - Feature Hashing
 - CatBoost Encoding
 - GLMM Encoding
 
 ---
 
-## Machine Learning Algorithms Used
+## 🤖 Machine Learning Algorithms Used
 
-To evaluate the impact of feature encoding, several supervised learning algorithms are applied:
+To evaluate encoding techniques, the following supervised models are applied:
 
 - Logistic Regression
 - Random Forest
@@ -61,16 +63,87 @@ To evaluate the impact of feature encoding, several supervised learning algorith
 - Support Vector Machine (SVM)
 - k-Nearest Neighbors (KNN)
 
-The performance of each model is evaluated after applying different encoding techniques.
+Each encoding technique is applied before model training, and model performance is compared.
 
 ---
 
-## Datasets
+## 🗂️ Datasets
 
-Datasets used in this project are primarily obtained from **OpenML**, which provides a large collection of machine learning datasets for benchmarking and experimentation.
+Datasets used in this project are primarily obtained from **OpenML**.
 
-The selected datasets contain **categorical variables with varying cardinality**, allowing analysis of how different encoding techniques perform under different conditions.
+These datasets contain categorical variables with varying levels of cardinality, allowing systematic comparison of encoding methods.
+
+Example datasets include:
+
+- Adult Census Dataset
+- Bank Marketing Dataset
+- Nomao Dataset
+- Internet Advertisement Dataset
+- Connect-4 Dataset
 
 ---
 
-## Repository Structure
+## ⚙️ Experimental Workflow
+
+The workflow followed in this research project is shown below:
+
+---
+
+## 📁 Repository Structure
+
+---
+
+## 🛠️ Installation
+
+Clone the repository:
+
+Install required libraries:
+
+---
+
+## 🚀 How to Run Experiments
+
+1. Load dataset
+2. Identify categorical variables
+3. Apply encoding techniques
+4. Train machine learning models
+5. Evaluate and compare model performance
+
+Example:
+
+---
+
+## 📊 Research Questions
+
+This project aims to answer the following questions:
+
+- How do different encoding techniques affect ML model performance?
+- Which encoding methods perform best for **high-cardinality categorical variables**?
+- Do advanced encoding techniques outperform classical encoding methods?
+- How does the choice of encoding influence model stability?
+
+---
+
+## 📚 References
+
+Key research papers used in this project include:
+
+- Micci-Barreca (2001) – Target Encoding
+- Weinberger et al. (2009) – Feature Hashing
+- Guo & Berkhahn (2016) – Entity Embeddings
+- Hancock & Khoshgoftaar (2020) – Survey on Categorical Data
+- Pargent et al. (2021) – Regularized Target Encoding
+
+---
+
+## 👨‍🎓 Author
+
+**Ricky**  
+M.Sc. Statistics  
+North Maharashtra University, Jalgaon
+
+---
+
+## 📄 License
+
+This repository is intended for **academic and research purposes**.
