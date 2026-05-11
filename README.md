@@ -47,7 +47,6 @@ The main goals of this research are:
 - Weight of Evidence Encoding
 
 ### Advanced Encoding Techniques
-- Feature Hashing
 - CatBoost Encoding
 - GLMM Encoding
 
